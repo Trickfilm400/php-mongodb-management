@@ -1,5 +1,15 @@
 This Project is a very, very simple PHP API for managing users (+ permissions) + databases in MongoDB
 
+## Features
+- Create + Delete Databases
+- Create + Delete Users
+- Grant + Revoke Roles for users on databases
+
+
+
+<img src=".github/screenshot_webpage.png" alt="Website Screenshot of Usage+Features">
+
+
 ### Usage
 
 ```yaml
