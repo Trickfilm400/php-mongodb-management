@@ -1,0 +1,7 @@
+.idea/
+composer.phar
+*.http
+docker-compose.yml
+#test mongo folder
+mongo/
+vendor/

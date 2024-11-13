@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MongoDB-User-Management</title>
+    <style>
+        #databases tbody tr {
+            border-collapse: collapse;
+            border: 1px solid grey;
+        }
+    </style>
+</head>
+<body onload="onload()">
+<div id="content">
+    <input style="display: block;width: 25em" placeholder="Bearer Token" id="auth_token" onchange="refresh()">
+    <br>
+    <div id="databases">
+        <input id="createDatabase_db_input" placeholder="DB Name">
+        <input id="createDatabase_col_input" placeholder="Collection Name">
+        <button onclick="createDatabase()">Create DB</button>
+        <table>
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>isEmpty</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <hr>
+    <div id="users">
+        <input id="createUser_name_input" placeholder="User-Name">
+        <input id="createUser_pw_input" placeholder="Password">
+        <input id="createUser_authSource_input" placeholder="authSource">
+        <button onclick="createUser()">Create User</button>
+        <!--        <input id="createUser_db_input" placeholder="DB Name">-->
+        <!--        <input id="createUser_col_input" placeholder="Collection Name">-->
+        <!--        <button onclick="createDatabase()">Create DB</button>-->
+        <table>
+            <thead>
+            <tr>
+                <th>Database Source</th>
+                <th>_id</th>
+                <th>Name/user</th>
+                <th>roles</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <hr>
+    <div id="userPermissions">
+        <table>
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+        <br>
+        <button onclick="saveUpdatedPermissions()">Save all Changes (changes will be shown before)</button>
+    </div>
+</div>
+<script>
+    let _DBS = [], _USER = []
+
+    function getAuthToken() {
+        return "Bearer " + document.getElementById("auth_token").value;
+    }
+
+    async function refresh() {
+        await getDatabases()
+        await getUsers()
+        generatePermissionsTable(_DBS, _USER)
+
+    }
+
+    async function onload() {
+        await refresh()
+
+    }
+
+    function createUser() {
+        const user_name = document.getElementById("createUser_name_input").value;
+        const pw_name = document.getElementById("createUser_pw_input").value;
+        const authSource_name = document.getElementById("createUser_authSource_input").value;
+        if (!user_name || !pw_name) return alert("Empty DB Name");
+        const query = new URLSearchParams();
+        query.set("username", user_name)
+        query.set("password", pw_name)
+        query.set("authSource", authSource_name)
+        console.log(query)
+        fetch(window.location.origin + "/api/users.php?" + query.toString(), {
+            method: "PUT",
+            headers: {
+                "Authorization": getAuthToken()
+            }
+
+        }).then(e => e.json()).then((e => {
+            alert(JSON.stringify(e));
+            getDatabases();
+        })).catch(alert);
+    }
+
+    function deleteUser(name) {
+        console.log(name)
+        //ask user via browser question
+        if (!confirm("delete user: " + name)) return;
+        const query = new URLSearchParams();
+        query.set("userId", name)
+        fetch(window.location.origin + "/api/users.php?" + query.toString(), {
+            method: "DELETE",
+            headers: {
+                "Authorization": getAuthToken()
+            }
+
+        }).then(e => e.json()).then((e => {
+            alert(JSON.stringify(e));
+            getDatabases();
+        })).catch(alert);
+    }
+
+    function createDatabase() {
+        const db_name = document.getElementById("createDatabase_db_input").value;
+        const col_name = document.getElementById("createDatabase_col_input").value;
+        if (!db_name || !col_name) return alert("Empty DB Name");
+        const query = new URLSearchParams();
+        query.set("database", db_name)
+        query.set("collection", col_name)
+        fetch(window.location.origin + "/api/databases.php?" + query.toString(), {
+            method: "PUT",
+            headers: {
+                "Authorization": getAuthToken()
+            }
+
+        }).then(e => e.json()).then((e => {
+            alert(JSON.stringify(e));
+            getDatabases();
+        })).catch(alert);
+    }
+
+    function deleteDatabase(name) {
+        console.log(name)
+        //ask user via browser question
+        if (!confirm("delete database: " + name)) return;
+        const query = new URLSearchParams();
+        query.set("database", name)
+        fetch(window.location.origin + "/api/databases.php?" + query.toString(), {
+            method: "DELETE",
+            headers: {
+                "Authorization": getAuthToken()
+            }
+
+        }).then(e => e.json()).then((e => {
+            alert(JSON.stringify(e));
+            getDatabases();
+        })).catch(alert);
+    }
+
+    function getDatabases() {
+        _DBS = []
+        return fetch(window.location.origin + "/api/databases.php", {
+            headers: {
+                "Authorization": getAuthToken()
+            }
+        }).then(e => e.json()).then(json => {
+            const tbody = document.querySelector("#databases table tbody");
+            tbody.innerHTML = "";
+            json.forEach(el => {
+                //console.log(el)
+                const tr = document.createElement("tr");
+                const td_name = document.createElement("td");
+                const td_size = document.createElement("td");
+                const td_isEmpty = document.createElement("td");
+                const td_actions = document.createElement("td");
+                const td_actions_delete = document.createElement("button");
+                td_actions_delete.innerText = "Delete DB";
+                td_actions_delete.onclick = function () {
+                    deleteDatabase(el.name);
+                };
+                td_actions.append(td_actions_delete)
+                td_name.innerText = el.name;
+                _DBS.push(el.name);
+                td_size.innerText = el.size / 1000 + "  KiloBytes";
+                td_isEmpty.innerText = el.isEmpty;
+                tr.append(td_name, td_size, td_isEmpty, td_actions);
+                tbody.append(tr)
+            })
+        })
+    }
+
+    function getUsers() {
+        _USER = []
+        return fetch(window.location.origin + "/api/users.php", {
+            headers: {
+                "Authorization": getAuthToken()
+            }
+
+        }).then(e => e.json()).then(json => {
+            const tbody = document.querySelector("#users table tbody");
+            tbody.innerHTML = "";
+            console.log(json)
+            if (!json.data) return alert("error while getting users")
+            for (const key in json.data) {
+                const el = json.data[key]
+                console.log(el)
+                el.db_user.forEach(el2 => {
+                    _USER.push(el2)
+                    const tr = document.createElement("tr");
+                    const td_db_source = document.createElement("td");
+                    const td_id = document.createElement("td");
+                    const td_name = document.createElement("td");
+                    const td_roles = document.createElement("td");
+                    const td_actions = document.createElement("td");
+                    const td_actions_delete = document.createElement("button");
+                    td_actions_delete.innerText = "Delete User";
+                    td_actions_delete.onclick = function () {
+                        deleteUser(el2._id);
+                    };
+                    td_actions.append(td_actions_delete)
+                    td_db_source.innerText = el2.db;
+                    td_name.innerText = el2.user;
+                    td_roles.innerText = JSON.stringify(el2.roles);
+                    td_id.innerText = el2._id;
+                    tr.append(td_db_source, td_id, td_name, td_roles, td_actions);
+                    tbody.append(tr)
+                })
+                el.system_user.forEach(el2 => {
+                    if (_USER.find(e => e._id === el2._id)) return;
+                    const tr = document.createElement("tr");
+                    const td_db_source = document.createElement("td");
+                    const td_id = document.createElement("td");
+                    const td_name = document.createElement("td");
+                    const td_roles = document.createElement("td");
+                    const td_actions = document.createElement("td");
+                    const td_actions_delete = document.createElement("button");
+                    td_actions_delete.innerText = "Delete User";
+                    console.log(el2._id)
+                    td_actions_delete.onclick = function () {
+                        deleteUser(el2._id);
+                    };
+                    td_actions.append(td_actions_delete)
+                    td_db_source.innerText = el2.db;
+                    td_name.innerText = el2.user;
+                    td_roles.innerText = JSON.stringify(el2.roles);
+                    td_id.innerText = el2._id;
+                    tr.append(td_db_source, td_id, td_name, td_roles, td_actions);
+                    tbody.append(tr)
+                })
+            }
+        }).catch(console.error)
+    }
+
+    const _ROLES = ["read", "readWrite", "dbAdmin", "dbOwner", "userAdmin", "clusterAdmin", "clusterManager", "clusterMonitor", "directShardOperations", "enableSharding", "hostManager", "backup", "restore", "readAnyDatabase", "readWriteAnyDatabase", "userAdminAnyDatabase", "dbAdminAnyDatabase", "root"]
+    //const selectLastValues = {};
+
+    const setPermissions = {
+        //user -> //db{}
+    }
+
+    function generatePermissionsTable(dbs, users) {
+        console.log("generating perm table", dbs, users)
+        const thead = document.querySelector("#userPermissions table thead");
+        const tbody = document.querySelector("#userPermissions table tbody");
+        const thead_tr = document.createElement("tr");
+        ["_USER_", ...dbs].forEach(el2 => {
+            const name = document.createElement("th");
+            name.innerText = el2
+            thead_tr.append(name);
+        })
+        thead.append(thead_tr)
+        /////
+        users.forEach(el2 => {
+            if (!setPermissions[el2._id]) setPermissions[el2._id] = {}
+            const tr = document.createElement("tr");
+            const name = document.createElement("td");
+            //map roles to record
+            // const roles = {}
+            // el2.roles.forEach(role => {
+            //     roles[role.db] = role;
+            // })
+            // console.log("roles", roles)
+            dbs.forEach(db => {
+                if (!setPermissions[el2._id][db]) setPermissions[el2._id][db] = {}
+                const db_td = document.createElement("td");
+                const select = document.createElement("select")
+                select.name = el2._id + "#" + db;
+                select.multiple = true;
+                //select.style.height = "15em"
+                // select.onchange = function (el) {
+                //     const confirmation = confirm("Really change permission for ... to ...?")
+                //     const [id, db1] = select.name.split("#")
+                //     console.log(id, db1)
+                //     if (!confirmation) {
+                //         el.preventDefault();
+                //         select.value = selectLastValues[db1][id]
+                //         return
+                //     }
+                //     selectLastValues[db1][id] = select.value;
+                // }
+
+                _ROLES.forEach(rol => {
+                    const opt = document.createElement("option");
+                    opt.innerText = rol;
+                    opt.value = rol;
+                    el2.roles.forEach(role => {
+                        if (role.db === db && role.role === rol) {
+                            opt.selected = true
+                            setPermissions[el2._id][db][rol] = true;
+                        }
+                    });
+
+                    select.appendChild(opt);
+                })
+                // if (roles[db]) {
+                //     console.log(db)
+                //     select.value = roles[db].role
+                //     //db_td.innerText = JSON.stringify(roles[db])
+                // } else {
+                //
+                //     select.value = "-"
+                // }
+                //if (!selectLastValues[db]) selectLastValues[db] = {}
+                //selectLastValues[db][el2._id] = select.selectedOptions
+                db_td.appendChild(select);
+                tr.append(db_td)
+            })
+            name.innerText = el2._id
+            tr.prepend(name);
+            tbody.append(tr)
+            console.log("setPerm", setPermissions)
+        })
+    }
+
+    function saveUpdatedPermissions() {
+        const currentValues = {}
+        const newRoles = {}
+        const oldRoles = {};
+        const thead = document.querySelector("#userPermissions table thead");
+        const tbody = document.querySelector("#userPermissions table tbody");
+        tbody.childNodes.forEach(node => {
+            //node == row == user
+            const name = node.childNodes.item(0).innerText
+            console.log(name)
+            currentValues[name] = {}
+            const currentUser = name;
+            node.childNodes.forEach((col, i) => {
+                //columns like username and then tables
+                if (i === 0) return;
+                //console.log(col.childNodes)
+                const z = col.childNodes.item(0).selectedOptions
+                const roles = []
+                for (const key of z) {
+                    roles.push(key.value)
+                }
+                // console.log("roles", roles)
+                const db = thead.childNodes.item(0).childNodes.item(i).innerText
+                currentValues[currentUser][db] = roles
+                //new roles
+                const oldPerms = setPermissions[currentUser][db]
+
+                roles.forEach(role => {
+                    if (oldPerms[role] === undefined) {
+                        console.log("new role found", role)
+                        if (!newRoles[currentUser]) newRoles[currentUser] = {}
+                        if (!newRoles[currentUser][db]) newRoles[currentUser][db] = []
+                        newRoles[currentUser][db].push(role)
+                    }
+                    // if (oldPerms[role] === true) console.log("role is immernoch given", role)
+                })
+                //
+                //removed roles
+                //
+                for (let key in oldPerms) {
+                    if (roles.includes(key) === false) {
+                        console.log("old role found", key)
+                        if (!oldRoles[currentUser]) oldRoles[currentUser] = {}
+                        if (!oldRoles[currentUser][db]) oldRoles[currentUser][db] = []
+                        oldRoles[currentUser][db].push(key)
+                    }
+                }
+            })
+        })
+        console.log("new", newRoles, "old", oldRoles)
+
+        const question = confirm("Confirm new Roles?:\n\n" + JSON.stringify(newRoles) + "\n\nOld:\n\n" + JSON.stringify(oldRoles))
+        const promiseArr = []
+        if (question) {
+            //was accepted, so saving new values:
+            for (let userName in newRoles) {
+                const user = newRoles[userName];
+                for (let db in user) {
+                    const roles = newRoles[userName][db]
+
+                    const params = new URLSearchParams();
+                    params.set("userId", userName)
+                    params.set("database", db)
+                    params.set("roles", roles)
+                    console.log(params)
+                    fetch(window.location.origin + "/api/updatePermission.php?" + params, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": getAuthToken()
+                        }
+
+                    }).then(e => e.json()).then(json => {
+                        console.log(json)
+                    })
+                }
+            }
+            //oldRoles
+            for (let userName in oldRoles) {
+                const user = oldRoles[userName];
+                for (let db in user) {
+                    const roles = oldRoles[userName][db]
+
+                    const params = new URLSearchParams();
+                    params.set("userId", userName)
+                    params.set("database", db)
+                    params.set("roles", roles)
+                    console.log(params)
+                    fetch(window.location.origin + "/api/updatePermission.php?" + params, {
+                        method: "DELETE",
+                        headers: {
+                            "Authorization": getAuthToken()
+                        }
+
+                    }).then(e => e.json()).then(json => {
+                        console.log(json)
+                    })
+                }
+            }
+        }
+
+    }
+</script>
+</body>
+</html>
